@@ -87,6 +87,12 @@
       <label for="code2">Code Snippet 2:</label>
       <textarea id="code2" name="code2" placeholder="Paste your Java code here..."></textarea>
 
+      <label for="expected_output">Expected Output:</label>
+      <textarea id="expected_output" name="expected_output" placeholder="Enter the expected output..."></textarea>
+
+      <label for="inputs">Inputs (for running the code):</label>
+      <textarea id="inputs" name="inputs" placeholder="Enter input values..."></textarea>
+
       <button type="button" onclick="compareCodes()">Compare</button>
     </form>
 
@@ -97,11 +103,18 @@
     async function compareCodes() {
       const code1 = document.getElementById('code1').value;
       const code2 = document.getElementById('code2').value;
+      const expected_output = document.getElementById('expected_output').value;
+      const inputs = document.getElementById('inputs').value;
 
       const response = await fetch('/compare', {
         method: 'POST',
         headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        body: new URLSearchParams({ code1, code2 })
+        body: new URLSearchParams({
+          code1,
+          code2,
+          expected_output,
+          inputs
+        })
       });
       const result = await response.json();
 
@@ -111,6 +124,7 @@
       } else {
         resultDiv.innerHTML = `
           <h3>Similarity: ${result.similarity}%</h3>
+          <p>Code similarity is: ${result.is_similar}</p>
           <div class="comparison-container">
             <div>
               <h4>Code Snippet 1:</h4>
@@ -121,6 +135,10 @@
               <div class="highlighted-output" id="code2-highlight"></div>
             </div>
           </div>
+          <h4>Java Output of Code 1:</h4>
+          <pre>${result.java_output_code1}</pre>
+          <h4>Java Output of Code 2:</h4>
+          <pre>${result.java_output_code2}</pre>
         `;
 
         document.getElementById("code1-highlight").innerHTML = applyHighlight(result.clean_code1, result.common_tokens);
@@ -134,10 +152,10 @@
       tokens.sort((a, b) => b.length - a.length); // Sort tokens by length (desc)
       const escapeRegex = (text) => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
-      const tokenSet = new Set(tokens); // Gunakan Set untuk memastikan token unik
+      const tokenSet = new Set(tokens); // Use Set to ensure unique tokens
       const regex = new RegExp(`\\b(${Array.from(tokenSet).map(escapeRegex).join('|')})\\b`, 'g');
 
-      // Ganti hanya kata-kata yang cocok
+      // Replace matched tokens with highlighted version
       return escapeHtml(code).replace(regex, (match) => `<mark>${match}</mark>`);
     }
 

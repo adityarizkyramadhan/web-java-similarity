@@ -6,16 +6,19 @@ import javalang
 import subprocess
 import os
 
-# Fungsi untuk menjalankan kode Java dengan input dan memverifikasi output
 def run_java_code_with_input(java_code: str, inputs: str, expected_output: str):
-    java_filename = "TempJavaCode.java"
-    class_filename = "TempJavaCode.class"
+    class_name_match = re.search(r'public\s+class\s+(\w+)', java_code)
+    if not class_name_match:
+        return "No public class found in the code."
+    class_name = class_name_match.group(1)
+
+    java_filename = f"{class_name}.java"
+    class_filename = f"{class_name}.class"
 
     with open(java_filename, "w") as file:
         file.write(java_code)
 
     try:
-        # Kompilasi kode Java menggunakan `javac`
         compile_process = subprocess.run(
             ["javac", java_filename],
             capture_output=True,
@@ -25,9 +28,8 @@ def run_java_code_with_input(java_code: str, inputs: str, expected_output: str):
         if compile_process.returncode != 0:
             return f"Compilation Error:\n{compile_process.stderr}"
 
-        # Eksekusi file `.class` menggunakan `java` dengan input dari Python
         run_process = subprocess.run(
-            ["java", java_filename.replace(".java", "")],
+            ["java", class_name],
             input=inputs,
             capture_output=True,
             text=True
@@ -35,16 +37,13 @@ def run_java_code_with_input(java_code: str, inputs: str, expected_output: str):
 
         if run_process.returncode != 0:
             return f"Runtime Error:\n{run_process.stderr}"
-
-        # Bandingkan output dengan yang diharapkan
         actual_output = run_process.stdout.strip()
         if actual_output == expected_output.strip():
             return f"Output is correct: {actual_output}"
         else:
-            return actual_output  # Return the actual output for comparison
+            return actual_output
 
     finally:
-        # Bersihkan file sementara
         if os.path.exists(java_filename):
             os.remove(java_filename)
         if os.path.exists(class_filename):
@@ -140,21 +139,16 @@ def compare():
     java_output1 = run_java_code_with_input(code1, inputs, expected_output)
     java_output2 = run_java_code_with_input(code2, inputs, expected_output)
 
-    if java_output1 != expected_output.strip() or java_output2 != expected_output.strip():
-        return jsonify({
-            "similarity": "not similar",
-            "java_output_code1": java_output1,
-            "java_output_code2": java_output2,
-            "common_tokens": list(set(highlighted_tokens)),
-            "common_positions_code1": common_positions1,
-            "common_positions_code2": common_positions2,
-            "clean_code1": code1_clean,
-            "clean_code2": code2_clean
-        })
+    is_similar = "similar"
+
+    # Jika output antara dua program tidak sama maka tidak similar
+    if java_output1 != java_output2:
+        is_similar = "not similar"
 
     # Jika output kedua kode sesuai dengan expected output
     return jsonify({
         "similarity": round(similarity, 2),
+        "is_similar": is_similar,
         "common_tokens": list(set(highlighted_tokens)),
         "common_positions_code1": common_positions1,
         "common_positions_code2": common_positions2,
