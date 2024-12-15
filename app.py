@@ -49,7 +49,6 @@ def run_java_code_with_input(java_code: str, inputs: str, expected_output: str):
         if os.path.exists(class_filename):
             os.remove(class_filename)
 
-# Fungsi untuk menemukan posisi token dalam teks
 def token_positions(tokens, text):
     positions = []
     for token in tokens:
@@ -58,7 +57,6 @@ def token_positions(tokens, text):
             positions.append((token, start, start + len(token)))
     return positions
 
-# Fungsi-fungsi utama
 def clean_code(code):
     code = re.sub(r'//.*', '', code)
     code = re.sub(r'/\*[\s\S]*?\*/', '', code)
@@ -76,7 +74,6 @@ def tokenize_code(cleaned_code):
 def generate_n_grams(tokens, n=4):
     return [" ".join(tokens[i:i + n]) for i in range(len(tokens) - n + 1)]
 
-# Highlight syntax similarities
 def highlight_syntax(tokens1, tokens2):
     highlighted_tokens = []
     for token in tokens1:
@@ -141,11 +138,9 @@ def compare():
 
     is_similar = "similar"
 
-    # Jika output antara dua program tidak sama maka tidak similar
     if java_output1 != java_output2:
         is_similar = "not similar"
 
-    # Jika output kedua kode sesuai dengan expected output
     return jsonify({
         "similarity": round(similarity, 2),
         "is_similar": is_similar,
