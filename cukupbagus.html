@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Code Similarity Checker</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/styles/github.min.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/highlight.min.js"></script>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 0;
+      padding: 0;
+      background-color: #f4f4f9;
+      color: #333;
+    }
+
+    .container {
+      max-width: 1200px;
+      margin: 50px auto;
+      background: white;
+      padding: 20px;
+      border-radius: 8px;
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    }
+
+    textarea,
+    .highlighted-output {
+      width: 100%;
+      height: 300px;
+      margin-bottom: 20px;
+      font-family: "Courier New", Courier, monospace;
+      font-size: 14px;
+      line-height: 1.5;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      padding: 10px;
+      white-space: pre-wrap;
+      overflow-y: auto;
+      background: #f4f4f9;
+    }
+
+    button {
+      background-color: #007bff;
+      color: white;
+      border: none;
+      padding: 10px 20px;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+
+    button:hover {
+      background-color: #0056b3;
+    }
+
+    .result {
+      margin-top: 20px;
+    }
+
+    mark {
+      background-color: yellow;
+      color: black;
+      font-weight: bold;
+    }
+  </style>
+</head>
+
+<body>
+  <div class="container">
+    <h1>Code Similarity Checker</h1>
+    <form id="compareForm">
+      <label for="code1">Code Snippet 1:</label>
+      <textarea id="code1" name="code1" placeholder="Paste your Java code here..."></textarea>
+
+      <label for="code2">Code Snippet 2:</label>
+      <textarea id="code2" name="code2" placeholder="Paste your Java code here..."></textarea>
+
+      <button type="button" onclick="compareCodes()">Compare</button>
+    </form>
+
+    <div id="result" class="result"></div>
+  </div>
+
+  <script>
+    async function compareCodes() {
+      const code1 = document.getElementById('code1').value;
+      const code2 = document.getElementById('code2').value;
+
+      const response = await fetch('/compare', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: new URLSearchParams({ code1, code2 })
+      });
+      const result = await response.json();
+
+      const resultDiv = document.getElementById('result');
+      if (result.error) {
+        resultDiv.innerHTML = `<p style="color: red;">${result.error}</p>`;
+      } else {
+        resultDiv.innerHTML = `
+          <h3>Similarity: ${result.similarity}%</h3>
+          <div class="comparison-container">
+            <div>
+              <h4>Code Snippet 1:</h4>
+              <div class="highlighted-output" id="code1-highlight"></div>
+            </div>
+            <div>
+              <h4>Code Snippet 2:</h4>
+              <div class="highlighted-output" id="code2-highlight"></div>
+            </div>
+          </div>
+        `;
+
+        document.getElementById("code1-highlight").innerHTML = applyHighlight(result.clean_code1, result.common_tokens);
+        document.getElementById("code2-highlight").innerHTML = applyHighlight(result.clean_code2, result.common_tokens);
+      }
+    }
+
+    function applyHighlight(code, tokens) {
+      if (!tokens || tokens.length === 0) return code;
+
+      tokens.sort((a, b) => b.length - a.length); // Sort tokens by length (desc)
+      const escapeRegex = (text) => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+      const tokenSet = new Set(tokens); // Gunakan Set untuk memastikan token unik
+      const regex = new RegExp(`\\b(${Array.from(tokenSet).map(escapeRegex).join('|')})\\b`, 'g');
+
+      // Ganti hanya kata-kata yang cocok
+      return code.replace(regex, (match) => `<mark>${match}</mark>`);
+    }
+  </script>
+</body>
+
+</html>
