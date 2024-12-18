@@ -5,8 +5,9 @@ import numpy as np
 import javalang
 import subprocess
 import os
+from concurrent.futures import ThreadPoolExecutor
 
-def run_java_code_with_input(java_code: str, inputs: str, expected_output: str):
+def run_java_code_with_input(java_code: str, inputs: str, expected_output: str, timeout: int = 10):
     class_name_match = re.search(r'public\s+class\s+(\w+)', java_code)
     if not class_name_match:
         return "No public class found in the code."
@@ -15,35 +16,50 @@ def run_java_code_with_input(java_code: str, inputs: str, expected_output: str):
     java_filename = f"{class_name}.java"
     class_filename = f"{class_name}.class"
 
-    with open(java_filename, "w") as file:
-        file.write(java_code)
-
     try:
+        # Tulis file kode Java
+        with open(java_filename, "w", encoding="utf-8") as file:
+            file.write(java_code)
+
+        # Compile kode Java
         compile_process = subprocess.run(
             ["javac", java_filename],
-            capture_output=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
             text=True
         )
 
         if compile_process.returncode != 0:
-            return f"Compilation Error:\n{compile_process.stderr}"
+            return f"Compilation Error:\n{compile_process.stderr.strip()}"
 
-        run_process = subprocess.run(
-            ["java", class_name],
-            input=inputs,
-            capture_output=True,
-            text=True
-        )
+        # Jalankan kode Java dengan input
+        try:
+            run_process = subprocess.run(
+                ["java", class_name],
+                input=inputs,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+                timeout=timeout
+            )
+        except subprocess.TimeoutExpired:
+            return "Runtime Error: The program took too long to execute."
 
         if run_process.returncode != 0:
-            return f"Runtime Error:\n{run_process.stderr}"
+            return f"Runtime Error:\n{run_process.stderr.strip()}"
+
+        # Validasi output
         actual_output = run_process.stdout.strip()
         if actual_output == expected_output.strip():
             return f"Output is correct: {actual_output}"
         else:
-            return actual_output
+            return f"Output is incorrect. Expected: {expected_output.strip()}, but got: {actual_output}"
+
+    except Exception as e:
+        return f"Error occurred: {str(e)}"
 
     finally:
+        # Hapus file sementara
         if os.path.exists(java_filename):
             os.remove(java_filename)
         if os.path.exists(class_filename):
@@ -58,10 +74,10 @@ def token_positions(tokens, text):
     return positions
 
 def clean_code(code):
-    code = re.sub(r'//.*', '', code)
-    code = re.sub(r'/\*[\s\S]*?\*/', '', code)
-    code = re.sub(r'import\s+.*;', '', code)
-    code = re.sub(r'\s+', ' ', code).strip()
+    code = re.sub(r'//.*', '', code)  # Hapus komentar baris
+    code = re.sub(r'/\*[\s\S]*?\*/', '', code)  # Hapus komentar blok
+    code = re.sub(r'import\s+.*;', '', code)  # Hapus import
+    code = re.sub(r'\s+', ' ', code).strip()  # Gabungkan whitespace
     return code
 
 def tokenize_code(cleaned_code):
@@ -133,13 +149,17 @@ def compare():
     common_positions1 = token_positions(highlighted_tokens, code1_clean)
     common_positions2 = token_positions(highlighted_tokens, code2_clean)
 
-    java_output1 = run_java_code_with_input(code1, inputs, expected_output)
-    java_output2 = run_java_code_with_input(code2, inputs, expected_output)
+    with ThreadPoolExecutor() as executor:
+        future1 = executor.submit(run_java_code_with_input, code1, inputs, expected_output)
+        future2 = executor.submit(run_java_code_with_input, code2, inputs, expected_output)
 
-    is_similar = "similar"
+        java_output1 = future1.result()
+        java_output2 = future2.result()
+
+    is_similar = "output and input same"
 
     if java_output1 != java_output2:
-        is_similar = "not similar"
+        is_similar = "output and input different"
 
     return jsonify({
         "similarity": round(similarity, 2),
@@ -154,4 +174,4 @@ def compare():
     })
 
 if __name__ == "__main__":
-    app.run(debug=True)
+    app.run(debug=True, threaded=True)
