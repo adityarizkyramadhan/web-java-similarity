@@ -6,6 +6,9 @@ import javalang
 import subprocess
 import os
 from concurrent.futures import ThreadPoolExecutor
+import tempfile
+import shutil
+import time
 
 def run_java_code_with_input(java_code: str, inputs: str, expected_output: str, timeout: int = 10):
     class_name_match = re.search(r'public\s+class\s+(\w+)', java_code)
@@ -13,8 +16,10 @@ def run_java_code_with_input(java_code: str, inputs: str, expected_output: str, 
         return "No public class found in the code."
     class_name = class_name_match.group(1)
 
-    java_filename = f"{class_name}.java"
-    class_filename = f"{class_name}.class"
+    # Buat direktori sementara
+    temp_dir = tempfile.mkdtemp()
+    java_filename = os.path.join(temp_dir, f"{class_name}.java")
+    class_filename = os.path.join(temp_dir, f"{class_name}.class")
 
     try:
         # Tulis file kode Java
@@ -35,7 +40,7 @@ def run_java_code_with_input(java_code: str, inputs: str, expected_output: str, 
         # Jalankan kode Java dengan input
         try:
             run_process = subprocess.run(
-                ["java", class_name],
+                ["java", "-cp", temp_dir, class_name],
                 input=inputs,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
@@ -50,21 +55,22 @@ def run_java_code_with_input(java_code: str, inputs: str, expected_output: str, 
 
         # Validasi output
         actual_output = run_process.stdout.strip()
-        if actual_output == expected_output.strip():
-            return f"Output is correct: {actual_output}"
-        else:
-            return f"Output is incorrect. Expected: {expected_output.strip()}, but got: {actual_output}"
+        # Return langsung expected apa actual output
+        return "Actual output : " + actual_output + ", expected output : " + expected_output
 
     except Exception as e:
         return f"Error occurred: {str(e)}"
 
     finally:
-        # Hapus file sementara
-        if os.path.exists(java_filename):
-            os.remove(java_filename)
-        if os.path.exists(class_filename):
-            os.remove(class_filename)
-
+        # Bersihkan file dan direktori sementara
+        try:
+            if os.path.exists(temp_dir):
+                shutil.rmtree(temp_dir)
+        except PermissionError as e:
+            print(f"PermissionError while deleting temp files: {e}")
+            time.sleep(1)  # Beri waktu sebelum mencoba lagi
+            if os.path.exists(temp_dir):
+                shutil.rmtree(temp_dir, ignore_errors=True)
 def token_positions(tokens, text):
     positions = []
     for token in tokens:
